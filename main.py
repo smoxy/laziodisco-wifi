@@ -51,6 +51,39 @@ def version():
 
 
 
+def lan_sharing(power: bool):
+    return
+    if power:
+        try:
+            with subprocess.Popen(["sudo", "wg-quick", "up", "wg1"], stdin=subprocess.PIPE) as proc:
+                proc.stdin.write(sudo_pwd)
+                proc.stdin.flush()
+            sleep(1)
+        except:
+            pass
+        subprocess.Popen(["sudo", "ip", "link", "set", eth0, "up"])
+        sleep(1)
+        subprocess.Popen(["sudo", "ifconfig", eth0, "up"])
+        sleep(1)
+        t_now = (dt.now()).strftime("%Y/%m/%d - %H:%M:%S")
+        logging.info(f"\t{t_now}\tWireguard and {eth0} turned ON!\n")
+    else:
+        with subprocess.Popen(["sudo", "ifconfig", eth0, "down"], stdin=subprocess.PIPE) as proc:
+            proc.stdin.write(sudo_pwd)
+            proc.stdin.flush()
+        sleep(1)
+        subprocess.Popen(["sudo", "ip", "link", "set", eth0, "down"])
+        sleep(1)
+        try:
+            subprocess.Popen(["sudo", "wg-quick", "down", "wg1"])
+            sleep(1)
+        except:
+            pass
+        t_now = (dt.now()).strftime("%Y/%m/%d - %H:%M:%S")
+        logging.info(f"\t{t_now}\t{eth0} and Wireguard turned OFF!\n")
+
+
+
 def getDriver(chromium: bool, headless: bool, noimage: bool, nolocation: bool, verbose: bool):
     locale = "en"
     chrome_options = Options()
@@ -78,7 +111,10 @@ def getDriver(chromium: bool, headless: bool, noimage: bool, nolocation: bool, v
         if chromium:
             path = ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install()
         else:
-            path = ChromeDriverManager().install()
+            try:
+                path = ChromeDriverManager().install()
+            except:
+                path = b"/home/smoxy/.wdm/drivers/chromedriver/linux64/109.0.5414/chromedriver"
         if verbose:
             print("browser driver path:",path)
 
@@ -106,21 +142,20 @@ def check(chromium: bool, headless: bool, noimage: bool, nolocation: bool, verbo
     down = int(not is_connected())
 
     while True:
-        sleep(10)
         if is_connected():
             if down:
-                subprocess.Popen(["sudo", "ip", "link", "set", eth0, "up"])
-                subprocess.Popen(["sudo", "ifconfig", eth0, "up"])
+                lan_sharing(True)
+
                 t_now = (dt.now()).strftime("%Y/%m/%d - %H:%M:%S")
                 if verbose:
                     print(f"{t_now}\tReconnected!")
                 logging.info(f"\t{t_now}\tReconnected!\n")
             down = 0
         else:
-            down += 1
-            subprocess.Popen(["sudo", "ifconfig", eth0, "down"])
-            subprocess.Popen(["sudo", "ip", "link", "set", eth0, "down"])
             t_now = (dt.now()).strftime("%Y/%m/%d - %H:%M:%S")
+            if not down:
+                lan_sharing(False)
+            down += 1
             if verbose:
                 print(f"{t_now}\tConnection Lost {down}...")
             logging.info(f"\t{t_now}\tConnection Lost {down}...")
@@ -131,6 +166,7 @@ def check(chromium: bool, headless: bool, noimage: bool, nolocation: bool, verbo
             elif down > 1:
                 #connect(chromium, headless, noimage, nolocation, verbose=verbose)
                 connectV2(chromium, headless, noimage, nolocation, verbose=verbose)
+        sleep(10)
                 
 
 
@@ -141,13 +177,16 @@ def connectV2(chromium: bool, headless: bool, noimage: bool, nolocation: bool, v
     link = "http://detectportal.firefox.com/canonical.html"
 
     if "linux" in platform.platform().lower():
-        subprocess.Popen(["sudo", "ip", "link", "set", wlan0, "down"])
+        with subprocess.Popen(["sudo", "ip", "link", "set", wlan0, "down"], stdin=subprocess.PIPE) as proc:
+            proc.stdin.write(sudo_pwd)
+            proc.stdin.flush()
         sleep(5)
 
         subprocess.Popen(["sudo", "ip", "link", "set", wlan0, "up"])
         sleep(5)
 
         subprocess.Popen(["sudo", "dhclient", "-r", wlan0])
+        sleep(3)
         t_now = (dt.now()).strftime("%Y/%m/%d - %H:%M:%S")
         if verbose:
             print(f"{t_now}\tRelease the current IP addr from wireless interface")
@@ -223,7 +262,9 @@ def renew_connection(mac: int, wait=True, log=False, verbose=False):
                 mac = mac % len(MACs)
                 MAC = MACs[mac]
 
-        subprocess.Popen(["sudo", "ifconfig", wlan0, "down"])
+        with subprocess.Popen(["sudo", "ifconfig", wlan0, "down"], stdin=subprocess.PIPE) as proc:
+            proc.stdin.write(sudo_pwd)
+            proc.stdin.flush()
         sleep(3)
 
         subprocess.Popen(["sudo", "ifconfig", wlan0, "hw", "ether", MAC])
@@ -233,10 +274,14 @@ def renew_connection(mac: int, wait=True, log=False, verbose=False):
         logging.info(f"\t{t_now}\tMAC address changed: {MAC}\tNEW!")        
         sleep(5)
 
-        subprocess.Popen(["sudo", "ifconfig", wlan0, "up"])
+        with subprocess.Popen(["sudo", "ifconfig", wlan0, "up"], stdin=subprocess.PIPE) as proc:
+            proc.stdin.write(sudo_pwd)
+            proc.stdin.flush()
         sleep(5)
 
-        subprocess.Popen(["sudo", "dhclient", "-r", wlan0])
+        with subprocess.Popen(["sudo", "dhclient", "-r", wlan0], stdin=subprocess.PIPE) as proc:
+            proc.stdin.write(sudo_pwd)
+            proc.stdin.flush()
         t_now = (dt.now()).strftime("%Y/%m/%d - %H:%M:%S")
         if verbose:
             print(f"{t_now}\tRelease the current IP addr from wireless interface")
@@ -271,19 +316,23 @@ def main(chromium: bool, headless: bool, noimage: bool, nolocation: bool, verbos
     if verbose:
         print(f"{t_now}\tRestarted!")
     logging.info(f"\t{t_now}\tRestarted!")
-    mac = 1
+    mac = 0
     while True:
+        mac = (mac + 1) % len(MACs)
         try:
             check(chromium, headless, noimage, nolocation, verbose=verbose, mac=mac)
         except KeyboardInterrupt:
             sys.exit()
+            quit()
         except Exception as err:
             err = str(err).replace('\n',"; ")
             t_now = (dt.now()).strftime("%Y/%m/%d - %H:%M:%S")
             if verbose:
                 print(f"{t_now}\t!!! ERRORE !!!")
             logging.error(f"\t{t_now}\t!!! ERRORE !!!\t{err}")
-            renew_connection(log=True, wait=False, verbose=verbose, mac=mac)
+            lan_sharing(0)
+            renew_connection(log=True, wait=True, verbose=verbose, mac=mac)
+            lan_sharing(1)
 
 
 
