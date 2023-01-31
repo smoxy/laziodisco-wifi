@@ -28,13 +28,13 @@ from config import *
 logging.basicConfig(filename=f".{os.sep}connection.log", encoding="utf-8", level=logging.INFO)
 
 V="0.1"
-shortopts = '''hcHilvV''' #if after the letter there is ':' so the argument is required
-longopts = ["help", "chromium", "headless", "noimage", "nolocation", "verbose", "version"] #if after name variable ther is '=' so the argument is required
+shortopts = '''hcHilvV''' #if after the letter there is ':' the argument is required
+longopts = ["help", "chromium", "headless", "noimage", "nolocation", "verbose", "version"] #if after name variable there is '=' the argument is required
 
 
 
 def help():
-    print(f"""instaTools {V}
+    print(f"""LazioDisco wifi {V}
 (C) 2022-2023 Simone Flavio Paris.
 Released under Apache License 2.0
     -h --help               Print this help screen.
@@ -109,15 +109,17 @@ def check(chromium: bool, headless: bool, noimage: bool, nolocation: bool, verbo
         sleep(10)
         if is_connected():
             if down:
-                subprocess.Popen(["sudo", "ip", "link", "set", "enp4s0", "up"])
+                subprocess.Popen(["sudo", "ip", "link", "set", eth0, "up"])
+                subprocess.Popen(["sudo", "ifconfig", eth0, "up"])
                 t_now = (dt.now()).strftime("%Y/%m/%d - %H:%M:%S")
                 if verbose:
                     print(f"{t_now}\tReconnected!")
                 logging.info(f"\t{t_now}\tReconnected!\n")
             down = 0
         else:
-            subprocess.Popen(["sudo", "ip", "link", "set", "enp4s0", "down"])
             down += 1
+            subprocess.Popen(["sudo", "ifconfig", eth0, "down"])
+            subprocess.Popen(["sudo", "ip", "link", "set", eth0, "down"])
             t_now = (dt.now()).strftime("%Y/%m/%d - %H:%M:%S")
             if verbose:
                 print(f"{t_now}\tConnection Lost {down}...")
@@ -128,7 +130,7 @@ def check(chromium: bool, headless: bool, noimage: bool, nolocation: bool, verbo
                 down = 1
             elif down > 1:
                 #connect(chromium, headless, noimage, nolocation, verbose=verbose)
-                connectV2(chromium, headless, noimage, nolocation, verbose=verbose, MAC=MACs[mac])
+                connectV2(chromium, headless, noimage, nolocation, verbose=verbose)
                 
 
 
@@ -139,13 +141,13 @@ def connectV2(chromium: bool, headless: bool, noimage: bool, nolocation: bool, v
     link = "http://detectportal.firefox.com/canonical.html"
 
     if "linux" in platform.platform().lower():
-        subprocess.Popen(["sudo", "ip", "link", "set", "wlp3s0", "down"])
+        subprocess.Popen(["sudo", "ip", "link", "set", wlan0, "down"])
         sleep(5)
 
-        subprocess.Popen(["sudo", "ip", "link", "set", "wlp3s0", "up"])
+        subprocess.Popen(["sudo", "ip", "link", "set", wlan0, "up"])
         sleep(5)
 
-        subprocess.Popen(["sudo", "dhclient", "-r", "wlp3s0"])
+        subprocess.Popen(["sudo", "dhclient", "-r", wlan0])
         t_now = (dt.now()).strftime("%Y/%m/%d - %H:%M:%S")
         if verbose:
             print(f"{t_now}\tRelease the current IP addr from wireless interface")
@@ -197,46 +199,6 @@ def connectV2(chromium: bool, headless: bool, noimage: bool, nolocation: bool, v
 
 
 
-def connect(chromium: bool, headless: bool, noimage: bool, nolocation: bool, verbose: bool):
-    driver = getDriver(chromium, headless, noimage, nolocation, verbose)
-    
-    #link = "http://www.msftconnecttest.com/redirect"
-    link = "http://detectportal.firefox.com/canonical.html"
-    
-    driver.get(link)
-    try:
-        WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.ID, "email_field"))).send_keys(USR)
-        WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.ID, "password_field"))).send_keys(PWD)
-        sleep(0.5)
-        WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.ID, "sign_in"))).click()
-        t_now = (dt.now()).strftime("%Y/%m/%d - %H:%M:%S")
-
-        if verbose:
-            print(f"{t_now}\tClick! 🖱")
-        logging.info(f"\t{t_now}\tClick! 🖱")
-        login_error = WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.CLASS_NAME, "login-error ")))
-        #t_now = (dt.now()).strftime("%Y/%m/%d - %H:%M:%S")
-        #logging.error(f"\t{t_now}\t{login_error}\n{type(login_error)}")
-
-        sleep(30)
-        driver.close()
-
-
-    except Exception as err:
-        err = str(err).replace('\n',"; ")
-        t_now = (dt.now()).strftime("%Y/%m/%d - %H:%M:%S")
-        if verbose:
-            print(dt.now().strftime("%Y/%m/%d - %H:%M:%S")+f"\t{err}")
-        logging.error(f"\t{t_now}\t{err}")
-        driver.close()
-        for t in range(15):
-            if is_connected():
-                return True
-            sleep(2)
-        return False
-
-
-
 def renew_connection(mac: int, wait=True, log=False, verbose=False):
     #TODO: make for linux and for windows
     #TODO: deactivate wifi, change MAC address for wifi, clear dns
@@ -261,20 +223,20 @@ def renew_connection(mac: int, wait=True, log=False, verbose=False):
                 mac = mac % len(MACs)
                 MAC = MACs[mac]
 
-        subprocess.Popen(["sudo", "ifconfig", "wlp3s0", "down"])
+        subprocess.Popen(["sudo", "ifconfig", wlan0, "down"])
         sleep(3)
 
-        subprocess.Popen(["sudo", "ifconfig", "wlp3s0", "hw", "ether", MAC])
+        subprocess.Popen(["sudo", "ifconfig", wlan0, "hw", "ether", MAC])
         t_now = (dt.now()).strftime("%Y/%m/%d - %H:%M:%S")
         if verbose:
             print(f"\t{t_now}\tMAC address changed: {MAC}\tNEW!")        
         logging.info(f"\t{t_now}\tMAC address changed: {MAC}\tNEW!")        
         sleep(5)
 
-        subprocess.Popen(["sudo", "ifconfig", "wlp3s0", "up"])
+        subprocess.Popen(["sudo", "ifconfig", wlan0, "up"])
         sleep(5)
 
-        subprocess.Popen(["sudo", "dhclient", "-r", "wlp3s0"])
+        subprocess.Popen(["sudo", "dhclient", "-r", wlan0])
         t_now = (dt.now()).strftime("%Y/%m/%d - %H:%M:%S")
         if verbose:
             print(f"{t_now}\tRelease the current IP addr from wireless interface")
