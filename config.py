@@ -1,0 +1,2 @@
+USR = "USERNAME"
+PWD = "PASSWORD"
