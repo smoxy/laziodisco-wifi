@@ -30,7 +30,6 @@ logging.basicConfig(filename=f".{os.sep}connection.log", encoding="utf-8", level
 V="0.1"
 shortopts = '''hcHilvV''' #if after the letter there is ':' so the argument is required
 longopts = ["help", "chromium", "headless", "noimage", "nolocation", "verbose", "version"] #if after name variable ther is '=' so the argument is required
-MACs = ["f4:7b:09:ab:b4:fe", "56:61:40:e4:84:5e", "02:68:b3:29:da:98", "02:3D:9A:23:DE:EF", "02:A8:14:E7:D7:C5"]#TODO: make a list of MAC addresses
 
 
 
