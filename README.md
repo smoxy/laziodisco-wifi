@@ -6,7 +6,8 @@ If you want the best results plan to execute this script after the reboot.
 
 
 ## requirements
-
+ > python==3.10
+ > 
  > pip install selenium==4.8.0
  >
  > pip install webdriver-manager==3.8.5
