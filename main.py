@@ -27,7 +27,7 @@ from config import *
 
 logging.basicConfig(filename=f".{os.sep}connection.log", encoding="utf-8", level=logging.INFO)
 
-V="0.1"
+V="0.2"
 shortopts = '''hcHilvV''' #if after the letter there is ':' the argument is required
 longopts = ["help", "chromium", "headless", "noimage", "nolocation", "verbose", "version"] #if after name variable there is '=' the argument is required
 
@@ -55,24 +55,26 @@ def lan_sharing(power: bool):
     return
     if power:
         try:
-            with subprocess.Popen(["sudo", "wg-quick", "up", "wg1"], stdin=subprocess.PIPE) as proc:
-                proc.stdin.write(sudo_pwd.encode())
-                proc.stdin.flush()
+            with subprocess.Popen(["sudo", "-S", "wg-quick", "up", "wg1"], stdin=subprocess.PIPE) as proc:
+                sleep(0.2)
+                proc.communicate(f"{sudo_pwd}\n".encode())
             sleep(1)
         except:
             pass
-        with subprocess.Popen(["sudo", "ip", "link", "set", eth0, "up"], stdin=subprocess.PIPE) as proc:
-            proc.stdin.write(sudo_pwd.encode())
-            proc.stdin.flush()
+        with subprocess.Popen(["sudo", "-S", "ip", "link", "set", eth0, "up"], stdin=subprocess.PIPE) as proc:
+            sleep(0.2)
+            proc.communicate(f"{sudo_pwd}\n".encode())
         sleep(1)
-        subprocess.Popen(["sudo", "ifconfig", eth0, "up"])
+        with subprocess.Popen(["sudo", "-S", "ifconfig", eth0, "up"], stdin=subprocess.PIPE) as proc:
+            sleep(0.2)
+            proc.communicate(f"{sudo_pwd}\n".encode())
         sleep(1)
         t_now = (dt.now()).strftime("%Y/%m/%d - %H:%M:%S")
         logging.info(f"\t{t_now}\tWireguard and {eth0} turned ON!\n")
     else:
-        with subprocess.Popen(["sudo", "ifconfig", eth0, "down"], stdin=subprocess.PIPE) as proc:
-            proc.stdin.write(sudo_pwd.encode())
-            proc.stdin.flush()
+        with subprocess.Popen(["sudo", "-S", "ifconfig", eth0, "down"], stdin=subprocess.PIPE) as proc:
+            sleep(0.2)
+            proc.communicate(f"{sudo_pwd}\n".encode())
         sleep(1)
         subprocess.Popen(["sudo", "ip", "link", "set", eth0, "down"])
         sleep(1)
@@ -132,7 +134,7 @@ def getDriver(chromium: bool, headless: bool, noimage: bool, nolocation: bool, v
 
 def is_connected():
     try:
-        socket.create_connection(("www.google.com",443))
+        socket.create_connection(("8.8.8.8",53),timeout=2)
         return True
     except OSError:
         pass
@@ -155,9 +157,9 @@ def check(chromium: bool, headless: bool, noimage: bool, nolocation: bool, verbo
             down = 0
         else:
             t_now = (dt.now()).strftime("%Y/%m/%d - %H:%M:%S")
-            if not down:
-                lan_sharing(False)
             down += 1
+            if down > 1:
+                lan_sharing(False)
             if verbose:
                 print(f"{t_now}\tConnection Lost {down}...")
             logging.info(f"\t{t_now}\tConnection Lost {down}...")
@@ -165,8 +167,7 @@ def check(chromium: bool, headless: bool, noimage: bool, nolocation: bool, verbo
             if down > 4:
                 mac = renew_connection(log=True, verbose=verbose, mac=mac)
                 down = 1
-            elif down > 1:
-                #connect(chromium, headless, noimage, nolocation, verbose=verbose)
+            elif down > 2:
                 connectV2(chromium, headless, noimage, nolocation, verbose=verbose)
         sleep(10)
                 
@@ -179,9 +180,9 @@ def connectV2(chromium: bool, headless: bool, noimage: bool, nolocation: bool, v
     link = "http://detectportal.firefox.com/canonical.html"
 
     if "linux" in platform.platform().lower():
-        with subprocess.Popen(["sudo", "ip", "link", "set", wlan0, "down"], stdin=subprocess.PIPE) as proc:
-            proc.stdin.write(sudo_pwd.encode())
-            proc.stdin.flush()
+        with subprocess.Popen(["sudo", "-S", "ip", "link", "set", wlan0, "down"], stdin=subprocess.PIPE) as proc:
+            sleep(0.2)
+            proc.communicate(f"{sudo_pwd}\n".encode())
         sleep(5)
 
         subprocess.Popen(["sudo", "ip", "link", "set", wlan0, "up"])
@@ -264,9 +265,9 @@ def renew_connection(mac: int, wait=True, log=False, verbose=False):
                 mac = mac % len(MACs)
                 MAC = MACs[mac]
 
-        with subprocess.Popen(["sudo", "ifconfig", wlan0, "down"], stdin=subprocess.PIPE) as proc:
-            proc.stdin.write(sudo_pwd.encode())
-            proc.stdin.flush()
+        with subprocess.Popen(["sudo", "-S", "ifconfig", wlan0, "down"], stdin=subprocess.PIPE) as proc:
+            sleep(0.2)
+            proc.communicate(f"{sudo_pwd}\n".encode())
         sleep(3)
 
         subprocess.Popen(["sudo", "ifconfig", wlan0, "hw", "ether", MAC])
@@ -276,14 +277,12 @@ def renew_connection(mac: int, wait=True, log=False, verbose=False):
         logging.info(f"\t{t_now}\tMAC address changed: {MAC}\tNEW!")        
         sleep(5)
 
-        with subprocess.Popen(["sudo", "ifconfig", wlan0, "up"], stdin=subprocess.PIPE) as proc:
-            proc.stdin.write(sudo_pwd.encode())
-            proc.stdin.flush()
+        subprocess.Popen(["sudo", "ifconfig", wlan0, "up"])
         sleep(5)
 
         with subprocess.Popen(["sudo", "dhclient", "-r", wlan0], stdin=subprocess.PIPE) as proc:
-            proc.stdin.write(sudo_pwd.encode())
-            proc.stdin.flush()
+            sleep(0.2)
+            proc.communicate(f"{sudo_pwd}\n".encode())
         t_now = (dt.now()).strftime("%Y/%m/%d - %H:%M:%S")
         if verbose:
             print(f"{t_now}\tRelease the current IP addr from wireless interface")
@@ -309,6 +308,7 @@ def renew_connection(mac: int, wait=True, log=False, verbose=False):
         else:
             logging.info(f"\t{t_now}\tRenewed!")
 
+    mac = mac+1
     return mac
 
 
