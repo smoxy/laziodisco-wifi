@@ -31,6 +31,10 @@ V="0.2"
 shortopts = '''hcHilvV''' #if after the letter there is ':' the argument is required
 longopts = ["help", "chromium", "headless", "noimage", "nolocation", "verbose", "version"] #if after name variable there is '=' the argument is required
 
+#with subprocess.Popen(["whoami"], stdout=subprocess.PIPE) as proc:
+#    whoami = proc.stdout.readline()
+#WHOAMI = whoami.decode().strip()
+
 
 
 def help():
@@ -58,6 +62,7 @@ def lan_sharing(power: bool):
             with subprocess.Popen(["sudo", "-S", "wg-quick", "up", "wg1"], stdin=subprocess.PIPE) as proc:
                 sleep(0.2)
                 proc.communicate(f"{sudo_pwd}\n".encode())
+                print()
             sleep(1)
         except:
             pass
@@ -65,12 +70,12 @@ def lan_sharing(power: bool):
             sleep(0.2)
             proc.communicate(f"{sudo_pwd}\n".encode())
         sleep(1)
-        with subprocess.Popen(["sudo", "-S", "ifconfig", eth0, "up"], stdin=subprocess.PIPE) as proc:
-            sleep(0.2)
-            proc.communicate(f"{sudo_pwd}\n".encode())
+        subprocess.Popen(["sudo", "ifconfig", eth0, "up"])
         sleep(1)
+
         t_now = (dt.now()).strftime("%Y/%m/%d - %H:%M:%S")
-        logging.info(f"\t{t_now}\tWireguard and {eth0} turned ON!\n")
+        logging.info(f"\t{t_now}\tWireguard and {eth0} turned ON!")
+
     else:
         with subprocess.Popen(["sudo", "-S", "ifconfig", eth0, "down"], stdin=subprocess.PIPE) as proc:
             sleep(0.2)
@@ -80,11 +85,13 @@ def lan_sharing(power: bool):
         sleep(1)
         try:
             subprocess.Popen(["sudo", "wg-quick", "down", "wg1"])
+            print()
             sleep(1)
         except:
             pass
+
         t_now = (dt.now()).strftime("%Y/%m/%d - %H:%M:%S")
-        logging.info(f"\t{t_now}\t{eth0} and Wireguard turned OFF!\n")
+        logging.info(f"\t{t_now}\t{eth0} and Wireguard turned OFF!")
 
 
 
@@ -111,22 +118,52 @@ def getDriver(chromium: bool, headless: bool, noimage: bool, nolocation: bool, v
     #chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--incognito")
 
-    if not ("raspi" in platform.platform().lower() or "aarch" in platform.platform().lower()): #or "linux" in platform.platform().lower()
-        if chromium:
-            path = ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install()
-        else:
-            try:
-                path = ChromeDriverManager().install()
-            except:
-                path = b"/home/smoxy/.wdm/drivers/chromedriver/linux64/109.0.5414/chromedriver"
+    if not ("raspi" in platform.platform().lower() or "aarch" in platform.platform().lower()):
+        if "linux" in platform.platform().lower():
+            if chromium:
+                try:
+                    path = ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install()
+                    with subprocess.Popen(["sudo", "-S", "cp", "-p", f"{path}", "/usr/lib/chromedriver/"], stdin=subprocess.PIPE) as proc:
+                        sleep(0.2)
+                        proc.communicate(f"{sudo_pwd}\n".encode())
+                except:
+                    path = b"/usr/lib/chromedriver/chromedriver"
+            else:
+                try:
+                    path = ChromeDriverManager().install()
+                    with subprocess.Popen(["sudo", "-S", "cp", "-p", f"{path}", "/usr/lib/chromedriver/"], stdin=subprocess.PIPE) as proc:
+                        sleep(0.2)
+                        proc.communicate(f"{sudo_pwd}\n".encode())
+                except:
+                    path = b"/usr/lib/chromedriver/chromedriver"
+            t_now = (dt.now()).strftime("%Y/%m/%d - %H:%M:%S")
+
+        else: #TODO: see what is platform.platform() under windows
+            if chromium:
+                try:
+                    path = ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install()
+                except:
+                    #TODO: path for windows
+                    quit()
+            else:
+                try:
+                    path = ChromeDriverManager().install()
+                    with subprocess.Popen(["sudo", "-S", "cp", "-p", f"{path}", "/usr/lib/chromedriver/"], stdin=subprocess.PIPE) as proc:
+                        sleep(0.2)
+                        proc.communicate(f"{sudo_pwd}\n".encode())
+                except:
+                    #TODO: path for windows
+                    quit()
+            t_now = (dt.now()).strftime("%Y/%m/%d - %H:%M:%S")
+
         if verbose:
-            print("browser driver path:",path)
+            print(f"\t{t_now}\tBrowser driver path: {path}")
+        logging.info(f"\t{t_now}\tBrowser driver path: {path}")
 
         driver = webdriver.Chrome(service=Service(path), options=chrome_options)
-    else: #If under arm, raspi or aarch
+    else:   # If under arm, raspi or aarch
         # you have to download the right driver and put here the path
-        if chromium:
-            driver = webdriver.Chrome(service=Service(f"{os.sep}usr{os.sep}lib{os.sep}chromium-browser{os.sep}chromedriver"), options=chrome_options)
+        driver = webdriver.Chrome(service=Service(b"/usr/lib/chromedriver/chromedriver"), options=chrome_options)
     
     return driver
 
@@ -134,7 +171,7 @@ def getDriver(chromium: bool, headless: bool, noimage: bool, nolocation: bool, v
 
 def is_connected():
     try:
-        socket.create_connection(("8.8.8.8",53),timeout=2)
+        socket.create_connection(("www.google.com",443),timeout=2)
         return True
     except OSError:
         pass
@@ -152,13 +189,13 @@ def check(chromium: bool, headless: bool, noimage: bool, nolocation: bool, verbo
 
                 t_now = (dt.now()).strftime("%Y/%m/%d - %H:%M:%S")
                 if verbose:
-                    print(f"{t_now}\tReconnected!")
+                    print(f"{t_now}\tReconnected!\n")
                 logging.info(f"\t{t_now}\tReconnected!\n")
             down = 0
         else:
             t_now = (dt.now()).strftime("%Y/%m/%d - %H:%M:%S")
             down += 1
-            if down > 1:
+            if down == 2:
                 lan_sharing(False)
             if verbose:
                 print(f"{t_now}\tConnection Lost {down}...")
@@ -189,8 +226,8 @@ def connectV2(chromium: bool, headless: bool, noimage: bool, nolocation: bool, v
         sleep(5)
 
         subprocess.Popen(["sudo", "dhclient", "-r", wlan0])
-        sleep(3)
         t_now = (dt.now()).strftime("%Y/%m/%d - %H:%M:%S")
+        sleep(5)
         if verbose:
             print(f"{t_now}\tRelease the current IP addr from wireless interface")
         logging.info(f"\t{t_now}\tRelease the current IP addr from wireless interface")
@@ -211,16 +248,12 @@ def connectV2(chromium: bool, headless: bool, noimage: bool, nolocation: bool, v
         logging.info(f"\t{t_now}\tClick! 🖱")
     
         try:
-            login_error = WebDriverWait(driver, 15, ignored_exceptions=(NoSuchElementException, StaleElementReferenceException,))\
-                        .until(EC.presence_of_element_located((By.CLASS_NAME, "login-error ")))
-            #login_error  = driver.find_element(By.CLASS_NAME, "login-error ")
+            login_error = WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.CLASS_NAME, "login-error ")))
             t_now = (dt.now()).strftime("%Y/%m/%d - %H:%M:%S")
             if verbose:
-                print(f"\t{t_now}\tlogin-error: {login_error}\n{type(login_error)}")
-            logging.error(f"\t{t_now}\tlogin-error: {login_error}\n{type(login_error)}")
-
-            #renew_connection(log=True, verbose=verbose, mac=1)
-
+                print(f"\t{t_now}\tlogin-error: Access Denied")
+            logging.error(f"\t{t_now}\tlogin-error: Access Denied")
+            renew_connection(log=True, verbose=verbose, mac=1)
         except TimeoutException:
             pass
         except NoSuchElementException:
@@ -236,23 +269,27 @@ def connectV2(chromium: bool, headless: bool, noimage: bool, nolocation: bool, v
     for t in range(30):
         if is_connected():
             return True
-        sleep(1)
+        sleep(0.5)
     return False
 
 
 
-def renew_connection(mac: int, wait=True, log=False, verbose=False):
+def renew_connection(mac: int, wait=True, log=True, verbose=False):
+    t_now = (dt.now()).strftime("%Y/%m/%d - %H:%M:%S")
+    if verbose:
+        print(f"\t{t_now}\tRenewing connection")
+    logging.info(f"\t{t_now}\tRenewing connection")
     #TODO: make for linux and for windows
     #TODO: deactivate wifi, change MAC address for wifi, clear dns
     if wait:
-        for t in range(30):
-            sleep(1)
+        for t in range(15):
             if is_connected():
                 t_now = (dt.now()).strftime("%Y/%m/%d - %H:%M:%S")
                 if verbose:
                     print(f"\t{t_now}\tRenew aborted")
                 logging.info(f"\t{t_now}\tRenew aborted")
                 return
+            sleep(1)
     if "linux" in platform.platform().lower():
         mac = mac % len(MACs)
         MAC = MACs[mac]
@@ -280,7 +317,7 @@ def renew_connection(mac: int, wait=True, log=False, verbose=False):
         subprocess.Popen(["sudo", "ifconfig", wlan0, "up"])
         sleep(5)
 
-        with subprocess.Popen(["sudo", "dhclient", "-r", wlan0], stdin=subprocess.PIPE) as proc:
+        with subprocess.Popen(["sudo", "-S", "dhclient", "-r", wlan0], stdin=subprocess.PIPE) as proc:
             sleep(0.2)
             proc.communicate(f"{sudo_pwd}\n".encode())
         t_now = (dt.now()).strftime("%Y/%m/%d - %H:%M:%S")
@@ -316,8 +353,8 @@ def renew_connection(mac: int, wait=True, log=False, verbose=False):
 def main(chromium: bool, headless: bool, noimage: bool, nolocation: bool, verbose:bool):
     t_now = (dt.now()).strftime("%Y/%m/%d - %H:%M:%S")
     if verbose:
-        print(f"{t_now}\tRestarted!")
-    logging.info(f"\t{t_now}\tRestarted!")
+        print(f"\n{t_now}\tRestarted!")
+    logging.info(f"\n\t{t_now}\tRestarted!")
     mac = 0
     while True:
         mac = (mac + 1) % len(MACs)
@@ -334,11 +371,18 @@ def main(chromium: bool, headless: bool, noimage: bool, nolocation: bool, verbos
             logging.error(f"\t{t_now}\t!!! ERRORE !!!\t{err}")
             lan_sharing(0)
             renew_connection(log=True, wait=True, verbose=verbose, mac=mac)
-            lan_sharing(1)
+            for t in range(15):
+                if is_connected:
+                    lan_sharing(1)
+                    break
 
 
 
 if __name__ == "__main__":
+    if "linux" in platform.platform().lower():
+        with subprocess.Popen(["sudo", "-S", "mkdir", "-p", "/usr/lib/chromedriver"], stdin=subprocess.PIPE) as proc:
+            sleep(0.2)
+            proc.communicate(f"{sudo_pwd}\n".encode())
     try:
         try:
             opts, args = getopt.getopt(args=sys.argv[1:], shortopts=shortopts, longopts=longopts)
